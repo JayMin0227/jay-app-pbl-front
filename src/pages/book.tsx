@@ -1524,11 +1524,21 @@ interface Memo {
 
 function ensureTagsArray(tags: string | string[] | undefined): string[] {
   if (Array.isArray(tags)) {
-    return tags;
-  } else if (typeof tags === "string") {
-    return tags.split(",");
+    return tags.flatMap((tag) => ensureTagsArray(tag));
   }
-  return [];
+
+  if (!tags) {
+    return [];
+  }
+
+  return tags
+    .split(/[,、，]/)
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
+function normalizeTagsForSave(tags: string): string {
+  return ensureTagsArray(tags).join(",");
 }
 
 export default function MemoApp() {
@@ -1565,7 +1575,7 @@ export default function MemoApp() {
       const dataToSend = {
         title: newTitle.trim(),
         content: newContent.trim(),
-        tags: newTags.trim(), // カンマ区切りの文字列形式で送信
+        tags: normalizeTagsForSave(newTags),
       };
   
       console.log("送信データ:", dataToSend); // デバッグ用ログ
@@ -1737,7 +1747,14 @@ export default function MemoApp() {
       const response = await axios.get(`${API_BASE_URL}/ideas/search`, {
         params: { keyword: searchKeyword.trim() },
       });
-      setFilteredMemos(response.data); // 検索結果を状態に保存
+
+      const normalizedMemos = response.data.map((memo: Memo) => ({
+        ...memo,
+        tags: ensureTagsArray(memo.tags),
+        isCompleted: memo.isCompleted ?? false,
+      }));
+
+      setFilteredMemos(normalizedMemos);
     } catch (err) {
       console.error("検索エラー:", err);
       alert("検索に失敗しました。");
@@ -1759,7 +1776,7 @@ export default function MemoApp() {
       await axios.post(`${API_BASE_URL}/ideas`, {
         title: newTitle,
         content: newContent,
-        tags: newTags,
+        tags: normalizeTagsForSave(newTags),
       });
       setNewTitle("");
       setNewContent("");
@@ -2213,7 +2230,7 @@ export default function MemoApp() {
                       <Input
                         value={newTags}
                         onChange={(e) => setNewTags(e.target.value)}
-                        placeholder="タグ (カンマ区切り)"
+                        placeholder="タグ（, / 、区切り）"
                       />
                     </Td>
                     <Td>
@@ -2409,7 +2426,7 @@ export default function MemoApp() {
 
     <HStack spacing={3} align="stretch">
       <Input
-        placeholder="タグ (カンマ区切り)"
+        placeholder="タグ（, / 、区切り）"
         value={newTags}
         onChange={(e) => setNewTags(e.target.value)}
         flex="1"
