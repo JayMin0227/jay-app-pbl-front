@@ -1549,7 +1549,9 @@ export default function MemoApp() {
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   // const dateRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [editTags, setEditTags] = useState("");
   const [isSearchVisible, setIsSearchVisible] = useState(false); // 検索バー表示状態
   const [searchKeyword, setSearchKeyword] = useState(""); // 検索キーワード
   const [filteredMemos, setFilteredMemos] = useState<Memo[]>([]); // 検索結果のメモ
@@ -1564,16 +1566,15 @@ export default function MemoApp() {
   const saveEdit = async (id: number) => {
     try {
       // 必須フィールドのチェック
-      if (!newTitle.trim() || !newContent.trim() || !newTags.trim()) {
-        alert("すべてのフィールドを入力してください！");
+      if (!editTitle.trim() || !editContent.trim()) {
+        alert("タイトルと内容を入力してください！");
         return;
       }
-  
       // サーバーが期待するデータ形式に整形
       const dataToSend = {
-        title: newTitle.trim(),
-        content: newContent.trim(),
-        tags: normalizeTagsForSave(newTags),
+        title: editTitle.trim(),
+        content: editContent.trim(),
+        tags: normalizeTagsForSave(editTags),
       };
   
       console.log("送信データ:", dataToSend); // デバッグ用ログ
@@ -1587,11 +1588,12 @@ export default function MemoApp() {
       console.log("サーバーからの応答:", response.data); // 成功時の応答
   
       // 成功時の処理
+// 成功時の処理
       await fetchMemos();
-      setEditMemoId(null); // 編集モードを解除
-      setNewTitle(""); // フォームをリセット
-      setNewContent("");
-      setNewTags("");
+      setEditMemoId(null);
+      setEditTitle("");
+      setEditContent("");
+      setEditTags("");
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         if (err.response) {
@@ -2308,16 +2310,16 @@ const groupedMemos = displayMemos.reduce(
                 <>
                   <Td>
                     <Input
-                      value={newTitle}
-                      onChange={(e) => setNewTitle(e.target.value)}
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
                       placeholder="タイトルを入力"
                     />
                   </Td>
 
                   <Td>
                     <Textarea
-                      value={newContent}
-                      onChange={(e) => setNewContent(e.target.value)}
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
                       placeholder="内容を入力"
                       minH="120px"
                       resize="vertical"
@@ -2326,8 +2328,8 @@ const groupedMemos = displayMemos.reduce(
 
                   <Td>
                     <Input
-                      value={newTags}
-                      onChange={(e) => setNewTags(e.target.value)}
+                      value={editTags}
+                      onChange={(e) => setEditTags(e.target.value)}
                       placeholder="タグ（, / 、区切り）"
                     />
                   </Td>
@@ -2360,9 +2362,9 @@ const groupedMemos = displayMemos.reduce(
                           _hover={{ bg: "red.600" }}
                           onClick={() => {
                             setEditMemoId(null);
-                            setNewTitle("");
-                            setNewContent("");
-                            setNewTags("");
+                            setEditTitle("");
+                            setEditContent("");
+                            setEditTags("");
                           }}
                         />
                       </Tooltip>
@@ -2435,9 +2437,9 @@ const groupedMemos = displayMemos.reduce(
                           _hover={{ bg: "blue.600" }}
                           onClick={() => {
                             setEditMemoId(memo.id);
-                            setNewTitle(memo.title);
-                            setNewContent(memo.content);
-                            setNewTags(memo.tags.join(", "));
+                            setEditTitle(memo.title);
+                            setEditContent(memo.content);
+                            setEditTags(memo.tags.join(", "));
                           }}
                         />
                       </Tooltip>
@@ -2470,22 +2472,21 @@ const groupedMemos = displayMemos.reduce(
       {editMemoId === memo.id ? (
         <VStack align="stretch" spacing={3}>
           <Input
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
             placeholder="タイトルを入力"
           />
-
           <Textarea
-            value={newContent}
-            onChange={(e) => setNewContent(e.target.value)}
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
             placeholder="内容を入力"
             minH="120px"
             resize="vertical"
           />
 
           <Input
-            value={newTags}
-            onChange={(e) => setNewTags(e.target.value)}
+            value={editTags}
+            onChange={(e) => setEditTags(e.target.value)}
             placeholder="タグ（, / 、区切り）"
           />
 
@@ -2516,9 +2517,9 @@ const groupedMemos = displayMemos.reduce(
                 _hover={{ bg: "red.600" }}
                 onClick={() => {
                   setEditMemoId(null);
-                  setNewTitle("");
-                  setNewContent("");
-                  setNewTags("");
+                  setEditTitle("");
+                  setEditContent("");
+                  setEditTags("");
                 }}
               />
             </Tooltip>
@@ -2599,9 +2600,9 @@ const groupedMemos = displayMemos.reduce(
                 _hover={{ bg: "blue.600" }}
                 onClick={() => {
                   setEditMemoId(memo.id);
-                  setNewTitle(memo.title);
-                  setNewContent(memo.content);
-                  setNewTags(memo.tags.join(", "));
+                  setEditTitle(memo.title);
+                  setEditContent(memo.content);
+                  setEditTags(memo.tags.join(", "));
                 }}
               />
             </Tooltip>
