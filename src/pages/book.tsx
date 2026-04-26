@@ -1724,12 +1724,7 @@ export default function MemoApp() {
   
   // 読み込み中の状態
   if (isLoading) {
-    return (
-      <VStack height="100vh" justify="center">
-        <Spinner size="xl" />
-        <Heading>読み込み中...</Heading>
-      </VStack>
-    );
+    return null;
   }
   
 
