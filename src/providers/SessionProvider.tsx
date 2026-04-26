@@ -113,7 +113,7 @@ export const SessionProvider = ({ children }: SessionProviderProps) => {
     if (!session && pathname !== "/") {
       router.replace("/");
     } else if (session && pathname === "/") {
-      router.replace("/loading");
+      router.replace("/book");
     }
   }, [isSessionChecked, session, pathname, router]);
 

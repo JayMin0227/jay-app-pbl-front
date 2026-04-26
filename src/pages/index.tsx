@@ -132,7 +132,11 @@ export default function MemoPage() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "github",
+        options: {
+          redirectTo: `${window.location.origin}/book`,
+        },
       });
+
       if (error) throw error;
       console.log("GitHub 認証開始");
     } catch (err) {
@@ -144,14 +148,14 @@ export default function MemoPage() {
   useEffect(() => {
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
-        console.log("セッション変更検出: /loading に遷移");
-        router.replace("/loading");
+        console.log("セッション変更検出: /book に遷移");
+        router.replace("/book");
       }
     });
 
     return () => {
       if (data?.subscription) {
-        data.subscription.unsubscribe(); // リスナー解除
+        data.subscription.unsubscribe();
       }
     };
   }, [router]);

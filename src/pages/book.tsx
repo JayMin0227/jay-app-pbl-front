@@ -1475,7 +1475,7 @@ import { ArrowUpIcon,HamburgerIcon,ArrowBackIcon } from "@chakra-ui/icons"; // �
 
 import { useEffect, useState} from "react";
 import {
-
+  Button,
   Table,
   TableContainer,
   Tbody,
@@ -1484,13 +1484,12 @@ import {
   Thead,
   Tr,
   Input,
+  Textarea,
   HStack,
   Tag,
   VStack,
   Box,
   Text,
-  Spinner,
-  Heading,
 } from "@chakra-ui/react";
 import axios from "axios";
 import { useRouter } from "next/router";
@@ -1523,11 +1522,21 @@ interface Memo {
 
 function ensureTagsArray(tags: string | string[] | undefined): string[] {
   if (Array.isArray(tags)) {
-    return tags;
-  } else if (typeof tags === "string") {
-    return tags.split(",");
+    return tags.flatMap((tag) => ensureTagsArray(tag));
   }
-  return [];
+
+  if (!tags) {
+    return [];
+  }
+
+  return tags
+    .split(/[,、，]/)
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
+function normalizeTagsForSave(tags: string): string {
+  return ensureTagsArray(tags).join(",");
 }
 
 export default function MemoApp() {
@@ -1544,7 +1553,7 @@ export default function MemoApp() {
   const [isSearchVisible, setIsSearchVisible] = useState(false); // 検索バー表示状態
   const [searchKeyword, setSearchKeyword] = useState(""); // 検索キーワード
   const [filteredMemos, setFilteredMemos] = useState<Memo[]>([]); // 検索結果のメモ
- 
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   
   
 
@@ -1564,13 +1573,16 @@ export default function MemoApp() {
       const dataToSend = {
         title: newTitle.trim(),
         content: newContent.trim(),
-        tags: newTags.trim(), // カンマ区切りの文字列形式で送信
+        tags: normalizeTagsForSave(newTags),
       };
   
       console.log("送信データ:", dataToSend); // デバッグ用ログ
   
       // サーバーにデータを送信
-      const response = await axios.put(`${API_BASE_URL}/ideas/${id}`, dataToSend);//change
+      const headers = await getAuthHeaders();
+      const response = await axios.put(`${API_BASE_URL}/ideas/${id}`, dataToSend, {
+        headers,
+      });
   
       console.log("サーバーからの応答:", response.data); // 成功時の応答
   
@@ -1673,22 +1685,46 @@ export default function MemoApp() {
 
 
 
+const getAuthHeaders = async () => {
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
 
+  if (error || !session?.access_token) {
+    router.replace("/");
+    throw new Error("ログイン情報が取得できませんでした。");
+  }
+
+  return {
+    Authorization: `Bearer ${session.access_token}`,
+  };
+};
 
   const fetchMemos = useCallback(async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/ideas`);
+      console.log("fetchMemos called");
+
+      const headers = await getAuthHeaders();
+      const res = await axios.get(`${API_BASE_URL}/ideas`, { headers });
+
+      console.log("GET /ideas response:", res.data);
+
       const sortedMemos = res.data.map((memo: Memo) => ({
         ...memo,
         tags: ensureTagsArray(memo.tags),
         formattedDate: formatDate(memo.created_at),
-        isCompleted: memo.isCompleted ?? false, // デフォルト値として false を設定
+        isCompleted: memo.isCompleted ?? false,
       }));
+
+      console.log("normalized memos:", sortedMemos);
+
       setMemos(sortedMemos);
     } catch (err) {
-      console.error(err);
+      console.error("fetchMemos error:", err);
+      alert("メモ一覧の取得に失敗しました。Consoleを確認してください。");
     }
-  }, []); // 依存配列を空にする（必要なら依存関係を追加）
+  }, []);
 
 
   useEffect(() => {
@@ -1713,12 +1749,7 @@ export default function MemoApp() {
   
   // 読み込み中の状態
   if (isLoading) {
-    return (
-      <VStack height="100vh" justify="center">
-        <Spinner size="xl" />
-        <Heading>読み込み中...</Heading>
-      </VStack>
-    );
+    return null;
   }
   
 
@@ -1733,33 +1764,73 @@ export default function MemoApp() {
     }
   
     try {
+      setSelectedTag(null);
+      const headers = await getAuthHeaders();
+
       const response = await axios.get(`${API_BASE_URL}/ideas/search`, {
         params: { keyword: searchKeyword.trim() },
+        headers,
       });
-      setFilteredMemos(response.data); // 検索結果を状態に保存
+
+      const normalizedMemos = response.data.map((memo: Memo) => ({
+        ...memo,
+        tags: ensureTagsArray(memo.tags),
+        isCompleted: memo.isCompleted ?? false,
+      }));
+
+      setFilteredMemos(normalizedMemos);
     } catch (err) {
       console.error("検索エラー:", err);
       alert("検索に失敗しました。");
     }
   };
 
-  
+  const handleTagFilter = (tag: string) => {
+  const normalizedTag = tag.trim();
+
+  if (!normalizedTag) {
+    return;
+  }
+
+  setSelectedTag(normalizedTag);
+  setSearchKeyword("");
+
+  const tagFilteredMemos = memos.filter((memo) =>
+    ensureTagsArray(memo.tags).includes(normalizedTag)
+  );
+
+  setFilteredMemos(tagFilteredMemos);
+};
+
+const clearTagFilter = () => {
+  setSelectedTag(null);
+  setFilteredMemos([]);
+  setSearchKeyword("");
+};
 
 
 
 
 
-  const addMemo = async () => {
+
+
+const addMemo = async () => {
     if (!newTitle || !newContent) {
       alert("タイトルと内容を入力してください！");
       return;
     }
     try {
-      await axios.post(`${API_BASE_URL}/ideas`, {
-        title: newTitle,
-        content: newContent,
-        tags: newTags,
-      });
+      const headers = await getAuthHeaders();
+
+      await axios.post(
+        `${API_BASE_URL}/ideas`,
+        {
+          title: newTitle,
+          content: newContent,
+          tags: normalizeTagsForSave(newTags),
+        },
+        { headers }
+      );
       setNewTitle("");
       setNewContent("");
       setNewTags("");
@@ -1772,7 +1843,8 @@ export default function MemoApp() {
 
   const deleteMemo = async (id: number) => {
     try {
-      await axios.delete(`${API_BASE_URL}/ideas/${id}`);
+      const headers = await getAuthHeaders();
+      await axios.delete(`${API_BASE_URL}/ideas/${id}`, { headers });
       fetchMemos();
     } catch (err) {
       console.error(err);
@@ -1869,16 +1941,18 @@ export default function MemoApp() {
   
 
 
-  const groupedMemos = (filteredMemos.length > 0 ? filteredMemos : memos).reduce(
-    (acc: Record<string, Memo[]>, memo) => {
-      // `created_at` から日付部分を抽出（スペースで区切る）
-      const date = memo.created_at.split(" ")[0];
-      if (!acc[date]) acc[date] = [];
-      acc[date].push(memo);
-      return acc;
-    },
-    {}
-  );
+const isFiltering = selectedTag !== null || searchKeyword.trim() !== "";
+const displayMemos = isFiltering ? filteredMemos : memos;
+
+const groupedMemos = displayMemos.reduce(
+  (acc: Record<string, Memo[]>, memo) => {
+    const date = memo.created_at.split(" ")[0];
+    if (!acc[date]) acc[date] = [];
+    acc[date].push(memo);
+    return acc;
+  },
+  {}
+);
 
 
 
@@ -1904,15 +1978,6 @@ export default function MemoApp() {
 
 
 
-
-  if (isLoading) {
-    return (
-      <VStack height="100vh" justify="center">
-        <Spinner size="xl" />
-        <Heading>読み込み中...</Heading>
-      </VStack>
-    );
-  }
 
 
 
@@ -2045,12 +2110,11 @@ export default function MemoApp() {
 
 
 
-            
 
 
 
 
-{/* 
+{/*
             <IconButton
         aria-label="閉じる目次"
         icon={<ArrowBackIcon  />} // 閉じるアイコン
@@ -2091,7 +2155,7 @@ export default function MemoApp() {
 
     </Box>
   ) : (
-    
+
 
 
     <Tooltip label="目次を開く">
@@ -2117,7 +2181,6 @@ export default function MemoApp() {
 
   )}
 </Box>
-      
 
 
 
@@ -2128,15 +2191,60 @@ export default function MemoApp() {
 
 
       {/* メモ一覧 */}
-      <VStack spacing={4} align="stretch" ml={isSidebarOpen ? "10%" : "5%"} w={isSidebarOpen ? "90%" : "95%"} h="calc(100vh - 60px)" overflowY="auto">
+
         {/* ログアウトボタン */}
 
-      
-        <Box position="fixed" top="1rem" right="1rem" zIndex="10">
-          <LogoutButton />
-        </Box>
-       
+      <VStack
+        spacing={4}
+        align="stretch"
+        ml={{ base: "56px", md: isSidebarOpen ? "10%" : "5%" }}
+        w={{ base: "calc(100% - 56px)", md: isSidebarOpen ? "90%" : "95%" }}
+        h="calc(100vh - 60px)"
+        overflowY="auto"
+        pb={{ base: "360px", md: "260px" }}
+      >
 
+
+        <Box
+          position="sticky"
+          top="0"
+          zIndex="20"
+          bg="white"
+          py={2}
+        >
+          <Box
+            display="flex"
+            flexDirection={{ base: "column", md: "row" }}
+            justifyContent="space-between"
+            alignItems={{ base: "stretch", md: "center" }}
+            gap={3}
+          >
+            <Box flex="1" minW="0">
+              {selectedTag && (
+                <HStack
+                  p={3}
+                  bg="blue.50"
+                  borderRadius="md"
+                  justifyContent="space-between"
+                  flexWrap="wrap"
+                  gap={2}
+                >
+                  <Text fontSize="sm" fontWeight="bold" wordBreak="break-word">
+                    タグ「{selectedTag}」で絞り込み中
+                  </Text>
+
+                  <Button size="sm" onClick={clearTagFilter}>
+                    絞り込み解除
+                  </Button>
+                </HStack>
+              )}
+            </Box>
+
+            <Box alignSelf={{ base: "flex-end", md: "center" }}>
+              <LogoutButton />
+            </Box>
+          </Box>
+        </Box>
 
 
 
@@ -2157,53 +2265,74 @@ export default function MemoApp() {
 
 
 
+{displayMemos.length === 0 && (
+  <Box p={4} bg="gray.50" borderRadius="md">
+    <Text color="gray.500">
+      該当するメモがありません。
+    </Text>
+  </Box>
+)}
 
-
- {Object.entries(groupedMemos).map(([date, memos]) => (
+{Object.entries(groupedMemos).map(([date, memos]) => (
   <Box key={date} id={`section-${date}`} p="4" borderWidth="1px" borderRadius="md" bg="white" shadow="sm">
     {/* 日付ヘッダー */}
     <Text fontWeight="bold" fontSize="lg" mb="2">
       {formatDate(date)}
     </Text>
     {memos.map((memo) => (
-      <Box key={memo.id} p="3" borderWidth="1px" borderRadius="md" bg="white" shadow="sm">
-        <TableContainer>
-          <Table variant="simple" size="sm">
-            <Thead>
-              <Tr>
-                <Th w="20%">タイトル</Th>
-                <Th w="50%">内容</Th>
-                <Th w="20%">タグ</Th>
-                <Th w="10%">操作</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              <Tr>
-                {editMemoId === memo.id ? (
-                  <>
-                    {/* 編集モード */}
-                    <Td>
-                      <Input
-                        value={newTitle}
-                        onChange={(e) => setNewTitle(e.target.value)}
-                        placeholder="タイトルを入力"
-                      />
-                    </Td>
-                    <Td>
-                      <Input
-                        value={newContent}
-                        onChange={(e) => setNewContent(e.target.value)}
-                        placeholder="内容を入力"
-                      />
-                    </Td>
-                    <Td>
-                      <Input
-                        value={newTags}
-                        onChange={(e) => setNewTags(e.target.value)}
-                        placeholder="タグ (カンマ区切り)"
-                      />
-                    </Td>
-                    <Td>
+  <Box
+    key={memo.id}
+    p="3"
+    borderWidth="1px"
+    borderRadius="md"
+    bg="white"
+    shadow="sm"
+  >
+    {/* PC用：テーブル表示 */}
+    <Box display={{ base: "none", md: "block" }}>
+      <TableContainer overflowX="auto">
+        <Table variant="simple" size="sm">
+          <Thead>
+            <Tr>
+              <Th w="20%">タイトル</Th>
+              <Th w="50%">内容</Th>
+              <Th w="20%">タグ</Th>
+              <Th w="10%">操作</Th>
+            </Tr>
+          </Thead>
+
+          <Tbody>
+            <Tr>
+              {editMemoId === memo.id ? (
+                <>
+                  <Td>
+                    <Input
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      placeholder="タイトルを入力"
+                    />
+                  </Td>
+
+                  <Td>
+                    <Textarea
+                      value={newContent}
+                      onChange={(e) => setNewContent(e.target.value)}
+                      placeholder="内容を入力"
+                      minH="120px"
+                      resize="vertical"
+                    />
+                  </Td>
+
+                  <Td>
+                    <Input
+                      value={newTags}
+                      onChange={(e) => setNewTags(e.target.value)}
+                      placeholder="タグ（, / 、区切り）"
+                    />
+                  </Td>
+
+                  <Td>
+                    <HStack spacing={2}>
                       <Tooltip label="保存">
                         <IconButton
                           aria-label="Save Memo"
@@ -2212,11 +2341,12 @@ export default function MemoApp() {
                           bg="green.500"
                           color="white"
                           borderRadius="full"
-                          size="lg"
+                          size="md"
                           _hover={{ bg: "green.600" }}
                           onClick={() => saveEdit(memo.id)}
                         />
                       </Tooltip>
+
                       <Tooltip label="キャンセル">
                         <IconButton
                           aria-label="Cancel Edit"
@@ -2235,43 +2365,63 @@ export default function MemoApp() {
                           }}
                         />
                       </Tooltip>
-                    </Td>
-                  </>
-                ) : (
-                  <>
-                    {/* 通常モード */}
-                    <Td
-                      whiteSpace="normal"
-                      textDecoration={memo.isCompleted ? "line-through" : "none"}
-                      onClick={() => toggleComplete(memo.id)}
-                      cursor="pointer"
-                    >
-                      {memo.title}
-                    </Td>
-                    <Td
-                      whiteSpace="normal"
-                      textDecoration={memo.isCompleted ? "line-through" : "none"}
-                      onClick={() => toggleComplete(memo.id)}
-                      cursor="pointer"
-                    >
-                      {memo.content}
-                    </Td>
-                    <Td>
+                    </HStack>
+                  </Td>
+                </>
+              ) : (
+                <>
+                  <Td
+                    whiteSpace="pre-wrap"
+                    overflowWrap="anywhere"
+                    wordBreak="break-word"
+                    textDecoration={memo.isCompleted ? "line-through" : "none"}
+                    onClick={() => toggleComplete(memo.id)}
+                    cursor="pointer"
+                  >
+                    {memo.title}
+                  </Td>
+
+                  <Td
+                    whiteSpace="pre-wrap"
+                    overflowWrap="anywhere"
+                    wordBreak="break-word"
+                    textDecoration={memo.isCompleted ? "line-through" : "none"}
+                    onClick={() => toggleComplete(memo.id)}
+                    cursor="pointer"
+                  >
+                    {memo.content}
+                  </Td>
+
+                  <Td>
+                    <HStack spacing={2} flexWrap="wrap">
                       {memo.tags.map((tag, index) => (
                         <Tag
                           key={index}
                           mr={1}
+                          mb={1}
                           cursor="pointer"
-                          maxWidth="100px"
-                          isTruncated
+                          maxW="180px"
+                          whiteSpace="normal"
+                          overflowWrap="anywhere"
+                          wordBreak="break-word"
+                          h="auto"
                           px={2}
+                          py={1}
                           fontSize="sm"
+                          colorScheme={selectedTag === tag ? "blue" : "gray"}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTagFilter(tag);
+                          }}
                         >
                           {tag}
                         </Tag>
                       ))}
-                    </Td>
-                    <Td>
+                    </HStack>
+                  </Td>
+
+                  <Td>
+                    <HStack spacing={2}>
                       <Tooltip label="編集">
                         <IconButton
                           aria-label="Edit Memo"
@@ -2290,6 +2440,7 @@ export default function MemoApp() {
                           }}
                         />
                       </Tooltip>
+
                       <Tooltip label="削除">
                         <IconButton
                           aria-label="Delete Memo"
@@ -2303,15 +2454,176 @@ export default function MemoApp() {
                           onClick={() => deleteMemo(memo.id)}
                         />
                       </Tooltip>
-                    </Td>
-                  </>
-                )}
-              </Tr>
-            </Tbody>
-          </Table>
-        </TableContainer>
-      </Box>
-    ))}
+                    </HStack>
+                  </Td>
+                </>
+              )}
+            </Tr>
+          </Tbody>
+        </Table>
+      </TableContainer>
+    </Box>
+
+    {/* スマホ用：カード表示 */}
+    <Box display={{ base: "block", md: "none" }}>
+      {editMemoId === memo.id ? (
+        <VStack align="stretch" spacing={3}>
+          <Input
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            placeholder="タイトルを入力"
+          />
+
+          <Textarea
+            value={newContent}
+            onChange={(e) => setNewContent(e.target.value)}
+            placeholder="内容を入力"
+            minH="120px"
+            resize="vertical"
+          />
+
+          <Input
+            value={newTags}
+            onChange={(e) => setNewTags(e.target.value)}
+            placeholder="タグ（, / 、区切り）"
+          />
+
+          <HStack justifyContent="flex-end" spacing={3}>
+            <Tooltip label="保存">
+              <IconButton
+                aria-label="Save Memo"
+                icon={<CheckIcon />}
+                colorScheme="green"
+                bg="green.500"
+                color="white"
+                borderRadius="full"
+                size="md"
+                _hover={{ bg: "green.600" }}
+                onClick={() => saveEdit(memo.id)}
+              />
+            </Tooltip>
+
+            <Tooltip label="キャンセル">
+              <IconButton
+                aria-label="Cancel Edit"
+                icon={<CloseIcon />}
+                colorScheme="red"
+                bg="red.500"
+                color="white"
+                borderRadius="full"
+                size="md"
+                _hover={{ bg: "red.600" }}
+                onClick={() => {
+                  setEditMemoId(null);
+                  setNewTitle("");
+                  setNewContent("");
+                  setNewTags("");
+                }}
+              />
+            </Tooltip>
+          </HStack>
+        </VStack>
+      ) : (
+        <VStack align="stretch" spacing={3}>
+          <Box>
+            <Text fontSize="xs" color="gray.500" fontWeight="bold">
+              タイトル
+            </Text>
+            <Text
+              whiteSpace="pre-wrap"
+              overflowWrap="anywhere"
+              wordBreak="break-word"
+              textDecoration={memo.isCompleted ? "line-through" : "none"}
+              onClick={() => toggleComplete(memo.id)}
+              cursor="pointer"
+            >
+              {memo.title}
+            </Text>
+          </Box>
+
+          <Box>
+            <Text fontSize="xs" color="gray.500" fontWeight="bold">
+              内容
+            </Text>
+            <Text
+              whiteSpace="pre-wrap"
+              overflowWrap="anywhere"
+              wordBreak="break-word"
+              textDecoration={memo.isCompleted ? "line-through" : "none"}
+              onClick={() => toggleComplete(memo.id)}
+              cursor="pointer"
+            >
+              {memo.content}
+            </Text>
+          </Box>
+
+          <Box>
+            <Text fontSize="xs" color="gray.500" fontWeight="bold">
+              タグ
+            </Text>
+
+            <HStack spacing={2} flexWrap="wrap">
+              {memo.tags.map((tag, index) => (
+                <Tag
+                  key={index}
+                  cursor="pointer"
+                  whiteSpace="normal"
+                  overflowWrap="anywhere"
+                  wordBreak="break-word"
+                  h="auto"
+                  px={2}
+                  py={1}
+                  colorScheme={selectedTag === tag ? "blue" : "gray"}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleTagFilter(tag);
+                  }}
+                >
+                  {tag}
+                </Tag>
+              ))}
+            </HStack>
+          </Box>
+
+          <HStack justifyContent="flex-end" spacing={3}>
+            <Tooltip label="編集">
+              <IconButton
+                aria-label="Edit Memo"
+                icon={<EditIcon />}
+                colorScheme="blue"
+                bg="blue.500"
+                color="white"
+                borderRadius="full"
+                size="md"
+                _hover={{ bg: "blue.600" }}
+                onClick={() => {
+                  setEditMemoId(memo.id);
+                  setNewTitle(memo.title);
+                  setNewContent(memo.content);
+                  setNewTags(memo.tags.join(", "));
+                }}
+              />
+            </Tooltip>
+
+            <Tooltip label="削除">
+              <IconButton
+                aria-label="Delete Memo"
+                icon={<DeleteIcon />}
+                colorScheme="gray"
+                bg="gray.500"
+                color="white"
+                borderRadius="full"
+                size="md"
+                _hover={{ bg: "gray.600" }}
+                onClick={() => deleteMemo(memo.id)}
+              />
+            </Tooltip>
+          </HStack>
+        </VStack>
+      )}
+    </Box>
+  </Box>
+))}
   </Box>
 ))}
 
@@ -2319,113 +2631,58 @@ export default function MemoApp() {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
        
-        <Box
-          position="fixed"
-          bottom="0"
-          left={isSidebarOpen ? "10%" : "5%"}
-          width={isSidebarOpen ? "85%" : "92%"}
-          bg="white"
-          p="4"
-          boxShadow="0 -2px 5px rgba(0,0,0,0.1)"
-          zIndex="100"
-        >
-          <HStack spacing={4}>
-            <Input
-              placeholder="タイトル"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              flex="1"
-            />
-            <Input
-              placeholder="内容"
-              value={newContent}
-              onChange={(e) => setNewContent(e.target.value)}
-              flex="2"
-            />
-            <Input
-              placeholder="タグ (カンマ区切り)"
-              value={newTags}
-              onChange={(e) => setNewTags(e.target.value)}
-              flex="1"
-            />
+      <Box
+  position="fixed"
+  bottom="0"
+  left={{ base: "56px", md: isSidebarOpen ? "10%" : "5%" }}
+  right="0"
+  bg="white"
+  p={{ base: 3, md: 4 }}
+  boxShadow="0 -2px 5px rgba(0,0,0,0.1)"
+  zIndex="100"
+>
+  <VStack spacing={3} align="stretch">
+    <Input
+      placeholder="タイトル"
+      value={newTitle}
+      onChange={(e) => setNewTitle(e.target.value)}
+    />
 
+    <Textarea
+      placeholder="内容"
+      value={newContent}
+      onChange={(e) => setNewContent(e.target.value)}
+      minH={{ base: "96px", md: "140px" }}
+      maxH={{ base: "180px", md: "260px" }}
+      resize="vertical"
+    />
 
-
-
-
-            {/* <Button colorScheme="teal" onClick={addMemo}>
-              追加
-            </Button> */}
-<Tooltip label="入力する">
-<Box
-      position="fixed"
-      bottom="14.5px" // ボタンを画面の下に固定
-      right="7px" // ボタンを画面の右に固定
-      zIndex="100" // ボタンが他の要素の上に表示されるように
-    >
-      <IconButton
-        aria-label="Add Memo" // アクセシビリティ用ラベル
-        icon={<ArrowUpIcon />} // 上矢印アイコンに変更
-        bg="black" // 背景色を黒に
-        color="white" // アイコンの色を白に
-        borderRadius="full" // ボタンを円形に
-        size="lg" // ボタンサイズを大きめに
-        boxShadow="lg" // ボタンに影を追加
-        _hover={{ bg: "gray.700" }} // ホバー時の背景色
-        onClick={addMemo} // 元々の「追加」機能をそのまま適用
+    <HStack spacing={3} align="stretch">
+      <Input
+        placeholder="タグ（, / 、区切り）"
+        value={newTags}
+        onChange={(e) => setNewTags(e.target.value)}
+        flex="1"
       />
-    </Box>
-    </Tooltip>
 
-
-
-
-
-
-
-          </HStack>
-        </Box>
-      </VStack>
+      <Tooltip label="入力する">
+        <IconButton
+          aria-label="Add Memo"
+          icon={<ArrowUpIcon />}
+          bg="black"
+          color="white"
+          borderRadius="full"
+          size="lg"
+          boxShadow="lg"
+          _hover={{ bg: "gray.700" }}
+          onClick={addMemo}
+        />
+      </Tooltip>
     </HStack>
-  );
+  </VStack>
+</Box>
+</VStack>
+</HStack>
+);
 }
