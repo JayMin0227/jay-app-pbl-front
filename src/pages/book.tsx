@@ -1490,8 +1490,6 @@ import {
   VStack,
   Box,
   Text,
-  Spinner,
-  Heading,
 } from "@chakra-ui/react";
 import axios from "axios";
 import { useRouter } from "next/router";
@@ -1581,7 +1579,10 @@ export default function MemoApp() {
       console.log("送信データ:", dataToSend); // デバッグ用ログ
   
       // サーバーにデータを送信
-      const response = await axios.put(`${API_BASE_URL}/ideas/${id}`, dataToSend);//change
+      const headers = await getAuthHeaders();
+      const response = await axios.put(`${API_BASE_URL}/ideas/${id}`, dataToSend, {
+        headers,
+      });
   
       console.log("サーバーからの応答:", response.data); // 成功時の応答
   
@@ -1684,22 +1685,46 @@ export default function MemoApp() {
 
 
 
+const getAuthHeaders = async () => {
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
 
+  if (error || !session?.access_token) {
+    router.replace("/");
+    throw new Error("ログイン情報が取得できませんでした。");
+  }
+
+  return {
+    Authorization: `Bearer ${session.access_token}`,
+  };
+};
 
   const fetchMemos = useCallback(async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/ideas`);
+      console.log("fetchMemos called");
+
+      const headers = await getAuthHeaders();
+      const res = await axios.get(`${API_BASE_URL}/ideas`, { headers });
+
+      console.log("GET /ideas response:", res.data);
+
       const sortedMemos = res.data.map((memo: Memo) => ({
         ...memo,
         tags: ensureTagsArray(memo.tags),
         formattedDate: formatDate(memo.created_at),
-        isCompleted: memo.isCompleted ?? false, // デフォルト値として false を設定
+        isCompleted: memo.isCompleted ?? false,
       }));
+
+      console.log("normalized memos:", sortedMemos);
+
       setMemos(sortedMemos);
     } catch (err) {
-      console.error(err);
+      console.error("fetchMemos error:", err);
+      alert("メモ一覧の取得に失敗しました。Consoleを確認してください。");
     }
-  }, []); // 依存配列を空にする（必要なら依存関係を追加）
+  }, []);
 
 
   useEffect(() => {
@@ -1740,8 +1765,11 @@ export default function MemoApp() {
   
     try {
       setSelectedTag(null);
+      const headers = await getAuthHeaders();
+
       const response = await axios.get(`${API_BASE_URL}/ideas/search`, {
         params: { keyword: searchKeyword.trim() },
+        headers,
       });
 
       const normalizedMemos = response.data.map((memo: Memo) => ({
@@ -1783,17 +1811,26 @@ const clearTagFilter = () => {
 
 
 
-  const addMemo = async () => {
+
+
+
+const addMemo = async () => {
     if (!newTitle || !newContent) {
       alert("タイトルと内容を入力してください！");
       return;
     }
     try {
-      await axios.post(`${API_BASE_URL}/ideas`, {
-        title: newTitle,
-        content: newContent,
-        tags: normalizeTagsForSave(newTags),
-      });
+      const headers = await getAuthHeaders();
+
+      await axios.post(
+        `${API_BASE_URL}/ideas`,
+        {
+          title: newTitle,
+          content: newContent,
+          tags: normalizeTagsForSave(newTags),
+        },
+        { headers }
+      );
       setNewTitle("");
       setNewContent("");
       setNewTags("");
@@ -1806,7 +1843,8 @@ const clearTagFilter = () => {
 
   const deleteMemo = async (id: number) => {
     try {
-      await axios.delete(`${API_BASE_URL}/ideas/${id}`);
+      const headers = await getAuthHeaders();
+      await axios.delete(`${API_BASE_URL}/ideas/${id}`, { headers });
       fetchMemos();
     } catch (err) {
       console.error(err);
@@ -1940,15 +1978,6 @@ const groupedMemos = displayMemos.reduce(
 
 
 
-
-  if (isLoading) {
-    return (
-      <VStack height="100vh" justify="center">
-        <Spinner size="xl" />
-        <Heading>読み込み中...</Heading>
-      </VStack>
-    );
-  }
 
 
 
