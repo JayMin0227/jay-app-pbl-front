@@ -1484,6 +1484,7 @@ import {
   Thead,
   Tr,
   Input,
+  Textarea,
   HStack,
   Tag,
   VStack,
@@ -2128,10 +2129,20 @@ export default function MemoApp() {
 
 
       {/* メモ一覧 */}
-      <VStack spacing={4} align="stretch" ml={isSidebarOpen ? "10%" : "5%"} w={isSidebarOpen ? "90%" : "95%"} h="calc(100vh - 60px)" overflowY="auto">
+      
         {/* ログアウトボタン */}
 
-      
+      <VStack
+        spacing={4}
+        align="stretch"
+        ml={{ base: "56px", md: isSidebarOpen ? "10%" : "5%" }}
+        w={{ base: "calc(100% - 56px)", md: isSidebarOpen ? "90%" : "95%" }}
+        h="calc(100vh - 60px)"
+        overflowY="auto"
+        pb={{ base: "360px", md: "260px" }}
+      >
+
+
         <Box position="fixed" top="1rem" right="1rem" zIndex="10">
           <LogoutButton />
         </Box>
@@ -2167,8 +2178,8 @@ export default function MemoApp() {
     </Text>
     {memos.map((memo) => (
       <Box key={memo.id} p="3" borderWidth="1px" borderRadius="md" bg="white" shadow="sm">
-        <TableContainer>
-          <Table variant="simple" size="sm">
+        <TableContainer overflowX="auto">
+          <Table variant="simple" size="sm" minW={{ base: "720px", md: "auto" }}>
             <Thead>
               <Tr>
                 <Th w="20%">タイトル</Th>
@@ -2190,10 +2201,12 @@ export default function MemoApp() {
                       />
                     </Td>
                     <Td>
-                      <Input
+                      <Textarea
                         value={newContent}
                         onChange={(e) => setNewContent(e.target.value)}
                         placeholder="内容を入力"
+                        minH="120px"
+                        resize="vertical"
                       />
                     </Td>
                     <Td>
@@ -2241,7 +2254,9 @@ export default function MemoApp() {
                   <>
                     {/* 通常モード */}
                     <Td
-                      whiteSpace="normal"
+                      whiteSpace="pre-wrap"
+                      overflowWrap="anywhere"
+                      wordBreak="break-word"
                       textDecoration={memo.isCompleted ? "line-through" : "none"}
                       onClick={() => toggleComplete(memo.id)}
                       cursor="pointer"
@@ -2249,7 +2264,9 @@ export default function MemoApp() {
                       {memo.title}
                     </Td>
                     <Td
-                      whiteSpace="normal"
+                      whiteSpace="pre-wrap"
+                      overflowWrap="anywhere"
+                      wordBreak="break-word"
                       textDecoration={memo.isCompleted ? "line-through" : "none"}
                       onClick={() => toggleComplete(memo.id)}
                       cursor="pointer"
@@ -2259,16 +2276,21 @@ export default function MemoApp() {
                     <Td>
                       {memo.tags.map((tag, index) => (
                         <Tag
-                          key={index}
-                          mr={1}
-                          cursor="pointer"
-                          maxWidth="100px"
-                          isTruncated
-                          px={2}
-                          fontSize="sm"
-                        >
-                          {tag}
-                        </Tag>
+                        key={index}
+                        mr={1}
+                        mb={1}
+                        cursor="pointer"
+                        maxW={{ base: "220px", md: "180px" }}
+                        whiteSpace="normal"
+                        overflowWrap="anywhere"
+                        wordBreak="break-word"
+                        h="auto"
+                        px={2}
+                        py={1}
+                        fontSize="sm"
+                      >
+                        {tag}
+                      </Tag>
                       ))}
                     </Td>
                     <Td>
@@ -2359,72 +2381,56 @@ export default function MemoApp() {
 
 
        
-        <Box
-          position="fixed"
-          bottom="0"
-          left={isSidebarOpen ? "10%" : "5%"}
-          width={isSidebarOpen ? "85%" : "92%"}
-          bg="white"
-          p="4"
-          boxShadow="0 -2px 5px rgba(0,0,0,0.1)"
-          zIndex="100"
-        >
-          <HStack spacing={4}>
-            <Input
-              placeholder="タイトル"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              flex="1"
-            />
-            <Input
-              placeholder="内容"
-              value={newContent}
-              onChange={(e) => setNewContent(e.target.value)}
-              flex="2"
-            />
-            <Input
-              placeholder="タグ (カンマ区切り)"
-              value={newTags}
-              onChange={(e) => setNewTags(e.target.value)}
-              flex="1"
-            />
+      <Box
+  position="fixed"
+  bottom="0"
+  left={{ base: "56px", md: isSidebarOpen ? "10%" : "5%" }}
+  right="0"
+  bg="white"
+  p={{ base: 3, md: 4 }}
+  boxShadow="0 -2px 5px rgba(0,0,0,0.1)"
+  zIndex="100"
+>
+  <VStack spacing={3} align="stretch">
+    <Input
+      placeholder="タイトル"
+      value={newTitle}
+      onChange={(e) => setNewTitle(e.target.value)}
+    />
 
+    <Textarea
+      placeholder="内容"
+      value={newContent}
+      onChange={(e) => setNewContent(e.target.value)}
+      minH={{ base: "96px", md: "140px" }}
+      maxH={{ base: "180px", md: "260px" }}
+      resize="vertical"
+    />
 
-
-
-
-            {/* <Button colorScheme="teal" onClick={addMemo}>
-              追加
-            </Button> */}
-<Tooltip label="入力する">
-<Box
-      position="fixed"
-      bottom="14.5px" // ボタンを画面の下に固定
-      right="7px" // ボタンを画面の右に固定
-      zIndex="100" // ボタンが他の要素の上に表示されるように
-    >
-      <IconButton
-        aria-label="Add Memo" // アクセシビリティ用ラベル
-        icon={<ArrowUpIcon />} // 上矢印アイコンに変更
-        bg="black" // 背景色を黒に
-        color="white" // アイコンの色を白に
-        borderRadius="full" // ボタンを円形に
-        size="lg" // ボタンサイズを大きめに
-        boxShadow="lg" // ボタンに影を追加
-        _hover={{ bg: "gray.700" }} // ホバー時の背景色
-        onClick={addMemo} // 元々の「追加」機能をそのまま適用
+    <HStack spacing={3} align="stretch">
+      <Input
+        placeholder="タグ (カンマ区切り)"
+        value={newTags}
+        onChange={(e) => setNewTags(e.target.value)}
+        flex="1"
       />
-    </Box>
-    </Tooltip>
 
-
-
-
-
-
-
-          </HStack>
-        </Box>
+      <Tooltip label="入力する">
+        <IconButton
+          aria-label="Add Memo"
+          icon={<ArrowUpIcon />}
+          bg="black"
+          color="white"
+          borderRadius="full"
+          size="lg"
+          boxShadow="lg"
+          _hover={{ bg: "gray.700" }}
+          onClick={addMemo}
+        />
+      </Tooltip>
+    </HStack>
+  </VStack>
+</Box>
       </VStack>
     </HStack>
   );
