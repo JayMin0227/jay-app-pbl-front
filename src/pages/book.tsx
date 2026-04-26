@@ -1964,7 +1964,13 @@ const groupedMemos = displayMemos.reduce(
 
   
 
-  
+const sidebarWidth = isSidebarOpen
+  ? { base: "260px", md: "240px" }
+  : { base: "56px", md: "64px" };
+
+const contentWidth = isSidebarOpen
+  ? { base: "calc(100% - 260px)", md: "calc(100% - 240px)" }
+  : { base: "calc(100% - 56px)", md: "calc(100% - 64px)" };
 
 
 
@@ -2007,7 +2013,7 @@ const groupedMemos = displayMemos.reduce(
         top="0"
         left="0"
         h="100vh"
-        w={isSidebarOpen ? "10%" : "5%"}
+        w={sidebarWidth}
         bg="gray.100"
         shadow="lg"
         transition="width 0.3s ease-in-out"
@@ -2015,23 +2021,34 @@ const groupedMemos = displayMemos.reduce(
       >
         {isSidebarOpen ? (
           <Box p="4">
-            <HStack justifyContent="space-between">
-  <Text fontWeight="bold" mb="4">
-    作業日時目次
-  </Text>
-  <Tooltip label="検索する">
-  <IconButton
-    aria-label="検索"
-    icon={<SearchIcon />}
-    size="sm"
-    onClick={() => setIsSearchVisible(!isSearchVisible)}
-  />
-  </Tooltip>
-</HStack>
+            
+  <HStack justifyContent="space-between" alignItems="center" mb="4" spacing={2}>
+    <Text
+      fontWeight="bold"
+      whiteSpace="nowrap"
+      overflow="hidden"
+      textOverflow="ellipsis"
+      mb="0"
+      flex="1"
+      minW="0"
+    >
+      作業日時目次
+    </Text>
+
+    <Tooltip label="検索する">
+      <IconButton
+        aria-label="検索"
+        icon={<SearchIcon />}
+        size="sm"
+        flexShrink={0}
+        onClick={() => setIsSearchVisible(!isSearchVisible)}
+      />
+    </Tooltip>
+  </HStack>
 
 {isSearchVisible && (
-  <Box mb="4">
-    <HStack>
+  <Box mb="4" w="100%">
+    <HStack align="stretch" spacing={2} w="100%">
       <Input
         placeholder="キーワードを入力"
         value={searchKeyword}
@@ -2039,14 +2056,15 @@ const groupedMemos = displayMemos.reduce(
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             if (searchKeyword.trim() === "") {
-              // キーワードが空の場合は元の画面に戻る
-              setFilteredMemos([]); // 検索結果をリセット
+              setFilteredMemos([]);
             } else {
-              handleSearch(); // 検索を実行
+              handleSearch();
             }
           }
         }}
         size="sm"
+        flex="1"
+        minW="0"
       />
 
 
@@ -2057,18 +2075,19 @@ const groupedMemos = displayMemos.reduce(
         検索
       </Button> */}
 
-<Tooltip label="空にしてEnterを押せば元に戻ります。">
-<IconButton
-  aria-label="検索" // アクセシビリティ対応
-  icon={<SearchIcon />} // Chakra UI の虫眼鏡アイコン
-  size="sm"
-  bg="brown" // 背景をブラウンに変更
-  color="white" // アイコンの色を白に
-  border="2px solid brown" // 枠線をブラウンに
-  borderRadius="md" // ボタンの角を丸くする
-  _hover={{ bg: "darkred" }} // ホバー時に背景色を濃い赤色に
-  onClick={handleSearch} // 検索機能はそのまま
-/>
+<Tooltip label="空にすれば元に戻ります。">
+  <IconButton
+    aria-label="検索"
+    icon={<SearchIcon />}
+    size="sm"
+    bg="brown"
+    color="white"
+    border="2px solid brown"
+    borderRadius="md"
+    flexShrink={0}
+    _hover={{ bg: "darkred" }}
+    onClick={handleSearch}
+  />
 </Tooltip>
 
 
@@ -2093,12 +2112,16 @@ const groupedMemos = displayMemos.reduce(
             section.scrollIntoView({ behavior: "smooth" });
           }
         }}
-        fontSize="sm" // 適度な文字サイズ
-        fontWeight="bold" // 文字を太く
-        color="black" // 黒色
-        cursor="pointer" // ポインタとして設定
+        fontSize="sm"
+        fontWeight="bold"
+        color="black"
+        cursor="pointer"
+        w="100%"
+        whiteSpace="nowrap"
+        overflow="hidden"
+        textOverflow="ellipsis"
         _hover={{
-          opacity: 0.7, // カーソルを合わせた時に透明感を追加
+          opacity: 0.7,
         }}
       >
         {formatDate(date)}
@@ -2200,11 +2223,12 @@ const groupedMemos = displayMemos.reduce(
       <VStack
         spacing={4}
         align="stretch"
-        ml={{ base: "56px", md: isSidebarOpen ? "10%" : "5%" }}
-        w={{ base: "calc(100% - 56px)", md: isSidebarOpen ? "90%" : "95%" }}
+        ml={sidebarWidth}
+        w={contentWidth}
         h="calc(100vh - 60px)"
         overflowY="auto"
         pb={{ base: "360px", md: "260px" }}
+        minW="0"
       >
 
 
@@ -2229,14 +2253,25 @@ const groupedMemos = displayMemos.reduce(
                   bg="blue.50"
                   borderRadius="md"
                   justifyContent="space-between"
-                  flexWrap="wrap"
+                  alignItems={{ base: "stretch", md: "center" }}
+                  flexDirection={{ base: "column", md: "row" }}
                   gap={2}
                 >
-                  <Text fontSize="sm" fontWeight="bold" wordBreak="break-word">
+                  <Text
+                    fontSize="sm"
+                    fontWeight="bold"
+                    wordBreak="break-word"
+                    minW="0"
+                  >
                     タグ「{selectedTag}」で絞り込み中
                   </Text>
 
-                  <Button size="sm" onClick={clearTagFilter}>
+                  <Button
+                    size="sm"
+                    onClick={clearTagFilter}
+                    alignSelf={{ base: "flex-start", md: "center" }}
+                    flexShrink={0}
+                  >
                     絞り込み解除
                   </Button>
                 </HStack>
@@ -2279,7 +2314,14 @@ const groupedMemos = displayMemos.reduce(
 {Object.entries(groupedMemos).map(([date, memos]) => (
   <Box key={date} id={`section-${date}`} p="4" borderWidth="1px" borderRadius="md" bg="white" shadow="sm">
     {/* 日付ヘッダー */}
-    <Text fontWeight="bold" fontSize="lg" mb="2">
+    <Text
+      fontWeight="bold"
+      fontSize="lg"
+      mb="2"
+      whiteSpace="nowrap"
+      overflow="hidden"
+      textOverflow="ellipsis"
+    >
       {formatDate(date)}
     </Text>
     {memos.map((memo) => (
@@ -2633,11 +2675,10 @@ const groupedMemos = displayMemos.reduce(
 
 
 
-       
-      <Box
+<Box
   position="fixed"
   bottom="0"
-  left={{ base: "56px", md: isSidebarOpen ? "10%" : "5%" }}
+  left={sidebarWidth}
   right="0"
   bg="white"
   p={{ base: 3, md: 4 }}
