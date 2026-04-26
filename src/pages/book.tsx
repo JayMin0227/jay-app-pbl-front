@@ -1685,7 +1685,8 @@ export default function MemoApp() {
 
 
 
-const getAuthHeaders = async () => {
+
+const getAuthHeaders = useCallback(async () => {
   const {
     data: { session },
     error,
@@ -1699,7 +1700,7 @@ const getAuthHeaders = async () => {
   return {
     Authorization: `Bearer ${session.access_token}`,
   };
-};
+}, [router]);
 
   const fetchMemos = useCallback(async () => {
     try {
@@ -1724,7 +1725,7 @@ const getAuthHeaders = async () => {
       console.error("fetchMemos error:", err);
       alert("メモ一覧の取得に失敗しました。Consoleを確認してください。");
     }
-  }, []);
+  }, [getAuthHeaders]);
 
 
   useEffect(() => {
