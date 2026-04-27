@@ -1589,7 +1589,8 @@ export default function MemoApp() {
   
       // 成功時の処理
 // 成功時の処理
-      await fetchMemos();
+// 成功時の処理
+      await refreshMemosKeepingFilter();
       setEditMemoId(null);
       setEditTitle("");
       setEditContent("");
@@ -1723,11 +1724,51 @@ const getAuthHeaders = useCallback(async () => {
       console.log("normalized memos:", sortedMemos);
 
       setMemos(sortedMemos);
+      return sortedMemos;
     } catch (err) {
       console.error("fetchMemos error:", err);
       alert("メモ一覧の取得に失敗しました。Consoleを確認してください。");
+      return null;
     }
   }, [getAuthHeaders]);
+
+
+
+  const refreshMemosKeepingFilter = async () => {
+  const latestMemos = await fetchMemos();
+
+  if (!latestMemos) {
+    return;
+  }
+
+  if (selectedTag) {
+    const tagFilteredMemos = latestMemos.filter((memo: Memo) =>
+      ensureTagsArray(memo.tags).includes(selectedTag)
+    );
+
+    setFilteredMemos(tagFilteredMemos);
+    return;
+  }
+
+  const keyword = searchKeyword.trim().toLowerCase();
+
+  if (keyword) {
+    const searchedMemos = latestMemos.filter((memo: Memo) => {
+      const tags = ensureTagsArray(memo.tags);
+
+      return (
+        memo.title.toLowerCase().includes(keyword) ||
+        memo.content.toLowerCase().includes(keyword) ||
+        tags.some((tag) => tag.toLowerCase().includes(keyword))
+      );
+    });
+
+    setFilteredMemos(searchedMemos);
+    return;
+  }
+
+  setFilteredMemos([]);
+};
 
 
   useEffect(() => {
@@ -1837,7 +1878,7 @@ const addMemo = async () => {
       setNewTitle("");
       setNewContent("");
       setNewTags("");
-      fetchMemos();
+      await refreshMemosKeepingFilter();
     } catch (err) {
       console.error(err);
       alert("メモの追加に失敗しました。");
@@ -1848,7 +1889,7 @@ const addMemo = async () => {
     try {
       const headers = await getAuthHeaders();
       await axios.delete(`${API_BASE_URL}/ideas/${id}`, { headers });
-      fetchMemos();
+      await refreshMemosKeepingFilter();
     } catch (err) {
       console.error(err);
       alert("削除に失敗しました。");
