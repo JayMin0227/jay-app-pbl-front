@@ -25,9 +25,14 @@ export function LogoutButton() {
   const router = useRouter();
   return (
     <Button
-      onClick={() => {
-        supabase.auth.signOut();
-        router.push("/");
+      onClick={async () => {
+        try {
+          await supabase.auth.signOut();
+          router.replace("/");
+        } catch (err) {
+          console.error("ログアウトエラー:", err);
+          router.replace("/");
+        }
       }}
     >
       ログアウト
